@@ -1,0 +1,273 @@
+---
+title: "House Sparrow Survival Prediction Using a Logistic Binary Regression"
+author: "Fanchao(Franco) Meng  23370209"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document: default
+  word_document: default
+  html_document:
+    df_print: paged
+bibliography: test.bib
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(knitr)
+library(corrplot)
+library(equatiomatic)
+library(MASS)
+library(directlabels)
+library(kableExtra)
+library(pander)
+```
+
+# Executive Summary
+
+This report is to investigate the relationship between house sparrow survival rate and their morphological measurements. Data on 163 house sparrow is collected by Anatomical Laboratory of Brown University after an uncommonly severe winter storm. A logistic binary regression was fitted to the data. The model indicates that overall, sparrows with shorter total length and lighter body weight, but longer sternum and humerus have a higher chance of survival. In addition being male also increases the chance of survival. 
+
+
+# 1 Introduction
+
+In order to better understand the natural selection process, and to investigate whether the survival of the house sparrows, is related to certain physical characteristics,which enable them to withstand the intensity of selective elimination. @Cite_1 used structural equation modelling techniques, found out that survival increased significantly with increasing general size. Wing length, which was independent of its relationship to the general size factor, was also significantly in their model, where higher survival was found among birds with shorter wings. Male also had higher survival rate comparing with female. @Cite_2 also thoroughly investigated the similar natural selection process by using cliff swallows survival data from different years. The research found that survivors had lower wing and outer tail asymmetry, low asymmetry in wings and tail made foraging more efficient and less costly. Mortality patterns did not differ by sex, but older birds suffered heavier mortality.
+
+Our analysis will be based on Bumpus data to investigate the relationship between survival rate and the morphological measurements. The data contains 136 house sparrow information recorded by anatomical laboratory of brown university, after an uncommonly severe winter storm in 1989. Some of these birds had survived and some had perished.
+
+# 2 Methodology
+
+We will use R statistical tool, firstly to explore the data by using numerical summaries, along with an correlation heat map. A logistic regression for binary count model will be fit to the data, the log survival odds ratio will be our response variable. The interactions will be explored and discussed, on whether any interactions should be included in our final model. The final model will be interpreted to explain which morphological attributes of house sparrow have significant influences on survival rate.
+
+
+# 3 Results
+
+## Summary Table
+
+A summary of the variables in the data set has been given in the table below. The footnote has demonstrated the meaning of "zero" and "one" in the summary. Due to the fact that there are nearly double of the male records than female records, we've decided to use male (0) as our reference level. The perished sparrows are noted with (0), in order to better predicted the survival rate. Overall the data is satisfactory. All the numeric measurement seems normal distributed, no obvious skewness in the data. 
+
+
+```{r echo=FALSE}
+bumpus_1 <- read.table("bumpus.txt", header = T, stringsAsFactors = T)
+bumpus_1$ID <- NULL
+bumpus_2 <- within(bumpus_1, {Survival <- as.numeric(Survival) 
+Sex <- (as.numeric(Sex)-2)*-1})
+bumpus_2$Sex <- factor(bumpus_2$Sex)
+bumpus_2$Survival <- factor(bumpus_2$Survival)
+#kable(summary(bumpus_1),format = "pipe", booktabs = TRUE) 
+x = kbl(summary(bumpus_2),longtable = F, booktabs = TRUE,col.names = c("Sex",
+                           "Survival",
+                           "TotalLenght (mm)",
+                           "AlarExtent (mm)","Weight (g)","BeakHead (mm)","Humerus (inches)","Femur (inches)","Tibiotarsus (inches)","SkullWidth (inches)","Sterum (inches)")) %>% 
+  kable_styling(latex_options = c( "hold_position","striped","scale_down"))%>%
+  row_spec(0,background="yellow")
+add_footnote(x, c("  ", "Sex Column : 0 = Male, 1 = Female ", "Survival Column : 0 = Survived, 1 = Perished"), notation = "none")
+
+  #kable_styling(latex_options="scale_down",font_size = 6)
+```
+
+
+## Correlation Map
+
+A correlation map between all the variables was built as below. The positive and negative correlation are indicated by blue and red colors, with the correlation coefficient listed. 95 percent of significance level is used for the P value, the $\times$ indicates the correlation is not significant. 
+
+From the graph below, we can see the **Humerus** and **Tibiotarsus** are highly correlated with **Femur**, the **Weight** and **TotalLength** are negatively correlated with **Survival**, and **Humerus** is positively correlated with **Survival**
+
+
+
+```{r echo=FALSE}
+library(corrplot)
+
+bumpus_3 <- within(bumpus_1, {Survival <- as.numeric(Survival) 
+Sex <- (as.numeric(Sex)-2)*-1})
+
+M_1 <- cor(bumpus_3)
+test_Res_1 = cor.mtest(bumpus_3, conf.level = 0.95)
+
+corrplot( M_1, p.mat = test_Res_1$p, method = 'circle',  type = 'upper', insig='pch',addCoef.col ='black', number.cex = 0.8, order = 'hclust', diag=TRUE)
+
+
+```
+
+## Binary logistic regression
+
+Binary logistic regression model method has been chosen to fitted the model to **Survival**. A link function has been used in the model on the response variable **Survival**. The logit link function is used to model the probability of ‘success’ as a function of covariates. The purpose of the logit link is to take a linear combination of the value and convert to the scale of a probability (between 0 and 1).  
+
+
+$$\mathbf{Logit(\pi_{i}) = Log(\frac{\pi_{i}}{1-\pi_{i}}})$$
+Two binary logistic models were fitted to *Survival*, one with interactions and one without any interactions. The model was initially reduced using *stepAIC* from *MASS* package. Then non significant variables have been dropped one by one, in the order from highest P-value to the lowest P-value. Both model equation includes only significant terms (P<0.05, Ward's test), the final two models have been given below: 
+
+
+```{r eval=FALSE, include=FALSE}
+bumpus_model <- glm(Survival ~ . , data = bumpus_2, family = binomial(link=logit))
+
+
+stepAIC(bumpus_model)
+
+```
+
+
+**Model 1 : Without interaction terms** 
+
+```{r echo=FALSE}
+bumpus_model_2 <- glm(formula = Survival ~ Sex + TotalLength + Weight + 
+    Humerus + Sternum, family = binomial(link = logit), data = bumpus_2)
+
+#summary(bumpus_model_2)
+
+extract_eq(bumpus_model_2, wrap = TRUE, use_coefs = TRUE,coef_digits = 3)
+```
+
+```{r eval=FALSE, include=FALSE}
+bumpus_model_10 <- glm(Survival ~ .^2 , data = bumpus_2, family = binomial(link=logit))
+
+
+stepAIC(bumpus_model_10)
+
+```
+
+
+**Model 2 : With Interaction Terms**
+```{r echo=FALSE}
+bumpus_model_11 <- glm(formula = Survival ~ Sex + TotalLength + AlarExtent + 
+     Humerus + Femur + Tibiotarsus + SkullWidth + Sternum +
+    Sex:Sternum + TotalLength:SkullWidth + 
+    TotalLength:Sternum  + 
+    AlarExtent:SkullWidth + Humerus:Tibiotarsus + 
+    Femur:Tibiotarsus , family = binomial(link = logit), 
+    data = bumpus_2)
+
+extract_eq(bumpus_model_11, wrap = TRUE, terms_per_line = 2,use_coefs = TRUE,coef_digits = 3)
+```
+
+## Model Assumptions & Diagnostics
+
+The function **anova()** was used to compare two models, the result shows that the model with extra interaction terms, with loosing 9 degree of freedom is not statistically better than the model without the interactions. The more simple model 1 is prefered for better interpretation and prediction.
+
+```{r echo=FALSE}
+
+pander(anova (bumpus_model_2, bumpus_model_11, test = "Chisq"))
+```
+
+Similarly, the drop in deviance test has also been conducted to compare both models, with similar result:
+
+$$\mathbf{Pr(\chi^2_9 > (133.64 - 127.70)) = 0.745908}$$
+In order to ensure the model 1 is adequate, the goodness of fit test has then been carried out on the model without interactions. The result of large _p_-value indicate that the model is appropriate and adequate. 
+
+$$\mathbf{Pr(\chi^2_{130} > 133.64) = 0.3955299}$$
+Therefore we can conclude the Model 1 will be our final model. 
+
+
+## Prediction / Visualisaiton
+
+In order to compare the model predicted value with the survival records in our original data. The function **predict()** has been used, after the reverse transformation of the logit function, a list of **survival probability ( between 0 and 1)** was produced. 
+
+To conduct a meaningful comparison between original survival data records **(0:Perished, 1:Survived)**, with our list of **survival probability**. A classification was added, to define that the **probability >= 0.5** will be considered **survived**,the **probability < 0.5** will be considered **perished** . The **probability = 0.5** can be classified in both categories, however due to the decimal precision, our result does not include exact 0.5 situation.
+
+Below table is the result of the pair-wise comparison between predicted value and original data. There are **46 Perished** cases predicted correctly, and **58 Survived** cases predicted correctly. The model has correctly predicted **76.47%** by feeding the original data, a total of 136 records.
+
+```{r echo=FALSE}
+result <- round(exp(predict(bumpus_model_2, bumpus_2))/(1+exp(predict(bumpus_model_2, bumpus_2))),)
+rt <- table (result, bumpus_2$Survival)
+colnames(rt) <- c("Perished","Survived")
+rownames(rt) <- c("Perished","Survived")
+
+
+rt[1,1] = cell_spec(rt[1,1], color = "black", background = "green")
+rt[2,2] = cell_spec(rt[2,2], color = "black", background = "green")
+rt[1,2] = cell_spec(rt[1,2], color = "red")
+rt[2,1] = cell_spec(rt[2,1], color = "red")
+kbl(rt,booktabs = TRUE, escape = F) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"),position = "center",latex_options = c("hold_position"))
+```
+
+To visualize the predicted survival probability trend with just the increase of Humerus size, we've also taken the mean values of Weight, Sternum, and Total Length from the original data as three constant values for the model prediction, then 136 evenly distributed the data points were generated for Humerus Size, ranging from 0.5 inches to 0.9 inches, with steps of 0.0029411. Two lines were plotted respectively for male(0) and female(1) below. From the graph it shows the probably of survival has increased along with the increase of Humerus size.
+
+```{r echo=FALSE, out.width = "70%"}
+
+
+sample_data <- data.frame(bumpus_2)
+sample_data $ Sternum <- mean(bumpus_2 $ Sternum )
+sample_data $ Weight <- mean(bumpus_2 $ Weight )
+sample_data $ TotalLength <- mean(bumpus_2 $ TotalLength )
+dede <- seq (0.5,0.898,0.0029411)
+sample_data $ Sex <- 0
+sample_data $ Sex <- factor(sample_data $ Sex)
+sample_data $ Humerus <-dede
+#View(sample_data)
+
+pred_dede <- predict ( bumpus_model_2,sample_data, type = "response" )
+
+
+sample_data_2 <- data.frame(bumpus_2)
+sample_data_2 $ Sternum <- mean(bumpus_2 $ Sternum )
+sample_data_2 $ Weight <- mean(bumpus_2 $ Weight )
+sample_data_2 $ TotalLength <- mean(bumpus_2 $ TotalLength )
+sample_data_2 $ Sex <- 1
+sample_data_2 $ Sex <- factor(sample_data_2 $ Sex)
+sample_data_2 $ Humerus <-dede
+pred_dede_2 <- predict ( bumpus_model_2,sample_data_2, type = "response" )
+#pred_dede_2 
+
+
+
+
+
+
+#with(bumpus_3, plot(jitter(Humerus),Survival, col=(Sex+1)))
+plot(exp(pred_dede)/(1+exp(pred_dede))~dede, type = "l", lty=1, main="Survival Probably against Humerus Size ",
+        xlab="Humerus Size (inches)",
+        ylab="Survival Probably (P)")
+
+lines((exp(pred_dede_2)/(1+exp(pred_dede_2))) ~ dede, col = "red")
+
+legend(x = 0.74, y = 0.6,
+ legend=c("Male","Female"), lwd=0.5, col=c("black","red"), lty=c(1,1),cex=0.7,bty = "n")
+
+legend(x = "topleft", 
+       bg ="yellow", box.lwd = 2 , title="EQUATIONS", 
+       legend=("Logit(p) = 24.385 - 1.455 * Sex + 56.499 * Humerus - 65.07743"), 
+       cex=0.5)
+
+
+
+```
+
+
+
+
+## 4 Discussion 
+
+From the final model equation, note that the main effects of Total Length, Weight are negative, but the Humerus and Sternum are positive. The model interpretation is as follows:
+
+\begin{enumerate}
+
+
+\item 
+
+The odds of a male house sparrow surviving were about 5 times (exp(-1.455)) the odds of a female house sparrow surviving. 
+
+\item 
+
+With 1 unit (mm) decrease in Total Length, the odds of house sparrow surviving will be approximately increased by 46 percent. 
+
+With 1 unit (gram) decrease in Weight, the odds of house sparrow surviving will be approximately doubled (212 percent). 
+
+\item 
+With 0.01 unit (inches) increase in Humerus, the odds of house sparrow surviving will be approximately increased by 76 percent.
+
+With 0.01 unit (inches) increase in Sternum, the odds of house sparrow surviving will be approximately increased by 20 percent.
+
+\end{enumerate}
+
+
+Our results are slightly different to the result produced by others. However, the species, location, season may also contribute influences on the result.
+
+We note that there are nearly twice the male house sparrows than female sparrows in our data, the model may be improved with more evenly distributed gender cases. 
+
+Apart from the body measures, the **age** could also be a strong factor affecting the surviving ability in severe weather, also the wing and tail asymmetry may contribute to the balance control in strong winds. The two heaviest birds (outliers) weighing over 30g were both perished in our records.
+
+
+# References
+
+
+
