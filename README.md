@@ -1,4 +1,4 @@
-# Modeling-House-Sparrow-Survival-by-Using-R
+# House Sparrow Survival Prediction Using a Logistic Binary Regression
 This report is to investigate the relationship between house sparrow survival rate and their morphological
 measurements. <br>
 <br>
